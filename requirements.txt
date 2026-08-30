@@ -1,0 +1,7 @@
+# Étape 1 — simulateur et soft IOC
+caproto>=1.3
+numpy>=1.26
+pyyaml>=6.0
+
+# Outillage
+pytest>=8.0
