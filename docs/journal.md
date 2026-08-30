@@ -13,3 +13,7 @@
 - Cours rédigé : `docs/01-cours-epics-et-ligne-basse-energie.md`.
 - Reste à faire pour clore l'étape 1 : `config/pv_map.yaml`, `sim/beamline.py`,
   `sim/ioc.py`, `tests/`.
+- Décision : base de PV « réaliste » (~70 canaux) pour l'étape 1, générée depuis
+  `config/pv_map.yaml` — consignes, mesures, états, vide, pour tous les équipements
+  de la LBE. Le coût marginal est faible puisque tout est déclaratif, et la démo
+  finale y gagne beaucoup.
