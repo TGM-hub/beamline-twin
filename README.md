@@ -29,13 +29,19 @@ Feuille de route détaillée : [`docs/00-feuille-de-route.md`](docs/00-feuille-d
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -r requirements.txt
-python -m sim.ioc             # démarre le soft IOC
-# dans un autre terminal :
-caproto-monitor LBE:ACCT-01:ITF
+
+python -m sim.pvmap           # liste la base de PV et contrôle sa cohérence
+pytest tests -q               # les tests qui figent le contrat
+
+python -m sim.ioc             # démarre le soft IOC  (à venir)
+caproto-monitor LBE:ACCT-01:ITF   # dans un autre terminal
 ```
 
 ## Documentation
 
 - [`docs/00-feuille-de-route.md`](docs/00-feuille-de-route.md) — le plan
-- [`docs/01-cours-epics-et-ligne-basse-energie.md`](docs/01-cours-epics-et-ligne-basse-energie.md) — cours de l'étape 1
+- [`docs/01-cours-epics-et-ligne-basse-energie.md`](docs/01-cours-epics-et-ligne-basse-energie.md) — cours de l'étape 1 : la ligne basse énergie et le modèle EPICS
+- [`docs/01b-convention-de-nommage.md`](docs/01b-convention-de-nommage.md) — la règle de nommage des PV et les choix à défendre
+- [`docs/02-cours-historian-et-logbook.md`](docs/02-cours-historian-et-logbook.md) — cours de l'étape 2 : archivage et journal de bord
+- [`docs/fiches-revision.md`](docs/fiches-revision.md) — 28 questions/réponses pour réviser sans support
 - [`docs/journal.md`](docs/journal.md) — cahier de bord des séances
