@@ -1,0 +1,289 @@
+# =====================================================================
+# beamline-twin — base de PV de la ligne basse énergie (LBE)
+# ---------------------------------------------------------------------
+# Ce fichier EST le schéma. Les noms de PV ne sont pas écrits à la main :
+# ils sont dérivés d'une règle appliquée aux équipements et à leurs
+# signaux. Voir docs/01b-convention-de-nommage.md.
+#
+#   <LIGNE> : <ÉQUIPEMENT>-<NN> : <SIGNAL>[_SP|_RB]
+#
+# kind :
+#   pair    -> génère DEUX PV : <SIG>_SP (consigne, record ao)
+#                               <SIG>_RB (mesure,   record ai)
+#   ro      -> génère UNE PV  : <SIG>       (mesure seule, record ai)
+#   state   -> génère UNE PV  : <SIG>       (record mbbi, valeurs dans `states`)
+#   counter -> génère UNE PV  : <SIG>       (record longin, entier monotone)
+# =====================================================================
+
+line: LBE
+line_label_fr: Ligne basse énergie
+line_label_en: Low energy beam transport line
+
+defaults:
+  scan: 0.1 second      # 10 Hz
+  prec: 3
+  mdel: 0               # bande morte moniteur (0 = notifier tout changement)
+  adel: -1              # bande morte archivage (-1 = à régler à l'étape 2)
+
+devices:
+
+  # -------------------------------------------------------------------
+  # 1. Source ECR — produit les ions multichargés
+  # -------------------------------------------------------------------
+  - id: SRC-01
+    type: ecr_ion_source
+    label_fr: Source ECR 14 GHz
+    label_en: 14 GHz ECR ion source
+    signals:
+      - {sig: HF_P,        kind: pair,    egu: W,    value: 450.0,  lo: 0,    hi: 2000, prec: 0,
+         desc_fr: "Puissance HF injectée dans le plasma",
+         desc_en: "RF power injected into the plasma"}
+      - {sig: GAS_Q,       kind: pair,    egu: sccm, value: 1.20,   lo: 0,    hi: 5,    prec: 2,
+         desc_fr: "Débit de gaz support",
+         desc_en: "Support gas flow rate"}
+      - {sig: HT_U,        kind: pair,    egu: kV,   value: 40.0,   lo: 0,    hi: 60,   prec: 1,
+         desc_fr: "Tension d'extraction haute tension",
+         desc_en: "High voltage extraction potential"}
+      - {sig: HT_I,        kind: ro,      egu: mA,   value: 3.10,   lo: 0,    hi: 20,   prec: 2,
+         alarm: {high: 8.0, hihi: 12.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Courant débité par l'alimentation HT — un pic signale un claquage",
+         desc_en: "HV power supply drain current — a spike indicates a spark"}
+      - {sig: COIL_INJ_I,  kind: pair,    egu: A,    value: 620.0,  lo: 0,    hi: 1000, prec: 1,
+         desc_fr: "Courant de la bobine côté injection",
+         desc_en: "Injection-side coil current"}
+      - {sig: COIL_EXT_I,  kind: pair,    egu: A,    value: 580.0,  lo: 0,    hi: 1000, prec: 1,
+         desc_fr: "Courant de la bobine côté extraction",
+         desc_en: "Extraction-side coil current"}
+      - {sig: SPARK_CNT,   kind: counter, egu: "",   value: 0,
+         desc_fr: "Nombre cumulé de claquages haute tension depuis le démarrage",
+         desc_en: "Cumulative count of high voltage sparks since startup"}
+      - {sig: STATE,       kind: state,   states: [ARRET, ATTENTE, MARCHE, DEFAUT],
+         desc_fr: "État de la source",
+         desc_en: "Ion source state"}
+
+  # -------------------------------------------------------------------
+  # 2. Solénoïdes — focalisation basse énergie
+  # -------------------------------------------------------------------
+  - id: SOL-01
+    type: solenoid
+    label_fr: Solénoïde amont (avant dipôle)
+    label_en: Upstream solenoid (before dipole)
+    signals: &solenoid_signals
+      - {sig: I,    kind: pair, egu: A,   value: 118.0, lo: 0, hi: 300, prec: 2,
+         desc_fr: "Courant d'alimentation de la bobine",
+         desc_en: "Coil power supply current"}
+      - {sig: B,    kind: ro,   egu: T,   value: 0.295, lo: 0, hi: 0.8, prec: 4,
+         desc_fr: "Champ magnétique axial mesuré",
+         desc_en: "Measured axial magnetic field"}
+      - {sig: T,    kind: ro,   egu: degC, value: 34.0, lo: 0, hi: 120, prec: 1,
+         alarm: {high: 55.0, hihi: 70.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Température de la bobine — déclenche le verrouillage à 70 °C",
+         desc_en: "Coil temperature — trips the interlock at 70 °C"}
+      - {sig: ITLK, kind: state, states: [OK, DEFAUT],
+         desc_fr: "Verrouillage de sécurité de l'aimant",
+         desc_en: "Magnet safety interlock"}
+      - {sig: STATE, kind: state, states: [ARRET, MARCHE, DEFAUT],
+         desc_fr: "État de l'alimentation",
+         desc_en: "Power supply state"}
+
+  - id: SOL-02
+    type: solenoid
+    label_fr: Solénoïde aval (après dipôle)
+    label_en: Downstream solenoid (after dipole)
+    signals: *solenoid_signals
+
+  # -------------------------------------------------------------------
+  # 3. Dipôle d'analyse — sélectionne le rapport A/Q
+  # -------------------------------------------------------------------
+  - id: DIP-01
+    type: bending_magnet
+    label_fr: Dipôle d'analyse 90°
+    label_en: 90° analysing dipole
+    signals:
+      - {sig: I,     kind: pair, egu: A,    value: 214.0, lo: 0, hi: 400,  prec: 2,
+         desc_fr: "Courant d'alimentation du dipôle",
+         desc_en: "Dipole power supply current"}
+      - {sig: B,     kind: ro,   egu: T,    value: 0.4280, lo: 0, hi: 0.8, prec: 4,
+         desc_fr: "Champ magnétique mesuré dans l'entrefer",
+         desc_en: "Measured magnetic field in the gap"}
+      - {sig: AQ,    kind: ro,   egu: "",   value: 3.20,  lo: 1, hi: 7,    prec: 3,
+         desc_fr: "Rapport masse sur charge effectivement transmis, déduit du champ",
+         desc_en: "Mass-to-charge ratio actually transmitted, derived from the field"}
+      - {sig: T,     kind: ro,   egu: degC, value: 38.0,  lo: 0, hi: 120,  prec: 1,
+         alarm: {high: 55.0, hihi: 70.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Température de la bobine du dipôle",
+         desc_en: "Dipole coil temperature"}
+      - {sig: ITLK,  kind: state, states: [OK, DEFAUT],
+         desc_fr: "Verrouillage de sécurité de l'aimant",
+         desc_en: "Magnet safety interlock"}
+      - {sig: STATE, kind: state, states: [ARRET, MARCHE, DEFAUT],
+         desc_fr: "État de l'alimentation",
+         desc_en: "Power supply state"}
+
+  # -------------------------------------------------------------------
+  # 4. Correcteurs — recentrage du faisceau
+  # -------------------------------------------------------------------
+  - id: STE-01
+    type: steerer
+    label_fr: Correcteur horizontal/vertical
+    label_en: Horizontal/vertical steerer
+    signals:
+      - {sig: IH,    kind: pair, egu: A, value: 0.40, lo: -20, hi: 20, prec: 2,
+         desc_fr: "Courant du correcteur horizontal",
+         desc_en: "Horizontal steerer current"}
+      - {sig: IV,    kind: pair, egu: A, value: -0.15, lo: -20, hi: 20, prec: 2,
+         desc_fr: "Courant du correcteur vertical",
+         desc_en: "Vertical steerer current"}
+      - {sig: STATE, kind: state, states: [ARRET, MARCHE, DEFAUT],
+         desc_fr: "État de l'alimentation",
+         desc_en: "Power supply state"}
+
+  # -------------------------------------------------------------------
+  # 5. Fentes — nettoyage de la sélection A/Q
+  # -------------------------------------------------------------------
+  - id: SLT-01
+    type: slits
+    label_fr: Fentes d'analyse (plan de dispersion)
+    label_en: Analysing slits (dispersion plane)
+    signals:
+      - {sig: GAP,   kind: pair, egu: mm, value: 12.0, lo: 0, hi: 60, prec: 2,
+         desc_fr: "Ouverture entre les deux mâchoires",
+         desc_en: "Opening between the two jaws"}
+      - {sig: POS,   kind: pair, egu: mm, value: 0.0, lo: -30, hi: 30, prec: 2,
+         desc_fr: "Position du centre des fentes",
+         desc_en: "Slit centre position"}
+      - {sig: STATE, kind: state, states: [ARRET, MARCHE, MOUVEMENT, DEFAUT],
+         desc_fr: "État du mécanisme",
+         desc_en: "Mechanism state"}
+
+  # -------------------------------------------------------------------
+  # 6. Diagnostics
+  # -------------------------------------------------------------------
+  - id: ACCT-01
+    type: current_transformer
+    label_fr: Transformateur d'intensité, sortie source
+    label_en: Current transformer, source exit
+    signals:
+      - {sig: ITF, kind: ro, egu: uA, value: 812.0, lo: 0, hi: 2000, prec: 1,
+         alarm: {lolo: 50.0, low: 300.0, llsv: MAJOR, lsv: MINOR},
+         desc_fr: "Intensité du faisceau extrait, mesure non interceptive",
+         desc_en: "Extracted beam current, non-interceptive measurement"}
+
+  - id: ACCT-02
+    type: current_transformer
+    label_fr: Transformateur d'intensité, entrée RFQ
+    label_en: Current transformer, RFQ entrance
+    signals:
+      - {sig: ITF, kind: ro, egu: uA, value: 747.0, lo: 0, hi: 2000, prec: 1,
+         alarm: {lolo: 40.0, low: 250.0, llsv: MAJOR, lsv: MINOR},
+         desc_fr: "Intensité du faisceau en fin de ligne, mesure non interceptive",
+         desc_en: "Beam current at the end of the line, non-interceptive measurement"}
+
+  - id: FC-01
+    type: faraday_cup
+    label_fr: Cage de Faraday (interceptive)
+    label_en: Faraday cup (interceptive)
+    signals:
+      - {sig: ITF, kind: ro, egu: uA, value: 0.0, lo: 0, hi: 2000, prec: 1,
+         desc_fr: "Intensité collectée — nulle si la cage est escamotée",
+         desc_en: "Collected current — zero when the cup is retracted"}
+      - {sig: POS, kind: pair, egu: "", value: 0, lo: 0, hi: 1, prec: 0,
+         desc_fr: "Position de la cage : 0 = escamotée, 1 = insérée",
+         desc_en: "Cup position: 0 = retracted, 1 = inserted"}
+
+  - id: BPM-01
+    type: beam_position_monitor
+    label_fr: Mesure de position, avant dipôle
+    label_en: Beam position monitor, before dipole
+    signals: &bpm_signals
+      - {sig: X,   kind: ro, egu: mm, value: 0.2, lo: -20, hi: 20, prec: 2,
+         alarm: {lolo: -8.0, low: -4.0, high: 4.0, hihi: 8.0, llsv: MAJOR, lsv: MINOR, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Position horizontale du barycentre du faisceau",
+         desc_en: "Horizontal beam centroid position"}
+      - {sig: Y,   kind: ro, egu: mm, value: -0.1, lo: -20, hi: 20, prec: 2,
+         alarm: {lolo: -8.0, low: -4.0, high: 4.0, hihi: 8.0, llsv: MAJOR, lsv: MINOR, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Position verticale du barycentre du faisceau",
+         desc_en: "Vertical beam centroid position"}
+      - {sig: ITF, kind: ro, egu: uA, value: 800.0, lo: 0, hi: 2000, prec: 1,
+         desc_fr: "Intensité vue par le capteur de position (relative)",
+         desc_en: "Beam current seen by the position monitor (relative)"}
+
+  - id: BPM-02
+    type: beam_position_monitor
+    label_fr: Mesure de position, après dipôle
+    label_en: Beam position monitor, after dipole
+    signals: *bpm_signals
+
+  - id: PROF-01
+    type: profile_monitor
+    label_fr: Profileur à fil
+    label_en: Wire profile monitor
+    signals:
+      - {sig: SIGX, kind: ro, egu: mm, value: 4.10, lo: 0, hi: 30, prec: 2,
+         alarm: {high: 9.0, hihi: 14.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Largeur horizontale du faisceau (écart-type)",
+         desc_en: "Horizontal beam width (standard deviation)"}
+      - {sig: SIGY, kind: ro, egu: mm, value: 3.85, lo: 0, hi: 30, prec: 2,
+         alarm: {high: 9.0, hihi: 14.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Largeur verticale du faisceau (écart-type)",
+         desc_en: "Vertical beam width (standard deviation)"}
+      - {sig: POS,  kind: pair, egu: "", value: 0, lo: 0, hi: 1, prec: 0,
+         desc_fr: "Position du fil : 0 = escamoté, 1 = inséré",
+         desc_en: "Wire position: 0 = retracted, 1 = inserted"}
+
+  # -------------------------------------------------------------------
+  # 7. Vide
+  # -------------------------------------------------------------------
+  - id: VAC-01
+    type: vacuum_gauge
+    label_fr: Jauge de vide, chambre source
+    label_en: Vacuum gauge, source chamber
+    signals: &vac_signals
+      - {sig: P,     kind: ro, egu: mbar, value: 3.2e-8, lo: 1.0e-10, hi: 1.0e-3, prec: 2,
+         alarm: {high: 1.0e-7, hihi: 1.0e-6, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Pression résiduelle — une remontée dégrade la transmission",
+         desc_en: "Residual pressure — a rise degrades transmission"}
+      - {sig: STATE, kind: state, states: [ARRET, POMPAGE, NOMINAL, DEFAUT],
+         desc_fr: "État du groupe de pompage",
+         desc_en: "Pumping group state"}
+
+  - id: VAC-02
+    type: vacuum_gauge
+    label_fr: Jauge de vide, chambre du dipôle
+    label_en: Vacuum gauge, dipole chamber
+    signals: *vac_signals
+
+  - id: VAC-03
+    type: vacuum_gauge
+    label_fr: Jauge de vide, fin de ligne
+    label_en: Vacuum gauge, end of line
+    signals: *vac_signals
+
+  # -------------------------------------------------------------------
+  # 8. Grandeurs dérivées et état machine
+  #    Ces PV ne correspondent à aucun équipement : elles sont calculées
+  #    par l'IOC. C'est ici que les futures sorties du modèle IA
+  #    viendront se greffer (étape 4).
+  # -------------------------------------------------------------------
+  - id: MACH-01
+    type: derived
+    label_fr: Grandeurs machine
+    label_en: Machine-level quantities
+    signals:
+      - {sig: TRANS, kind: ro, egu: "%", value: 92.0, lo: 0, hi: 100, prec: 2,
+         alarm: {lolo: 70.0, low: 85.0, llsv: MAJOR, lsv: MINOR},
+         desc_fr: "Transmission de la ligne = ACCT-02 / ACCT-01",
+         desc_en: "Line transmission = ACCT-02 / ACCT-01"}
+      - {sig: LOSS,  kind: ro, egu: uA, value: 65.0, lo: 0, hi: 2000, prec: 1,
+         alarm: {high: 150.0, hihi: 300.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Perte de faisceau = ACCT-01 − ACCT-02",
+         desc_en: "Beam loss = ACCT-01 − ACCT-02"}
+      - {sig: AQ,     kind: pair, egu: "", value: 3.20, lo: 1, hi: 7, prec: 3,
+         desc_fr: "Rapport A/Q visé par le réglage en cours",
+         desc_en: "Target mass-to-charge ratio for the current tuning"}
+      - {sig: MODE,  kind: state, states: [ARRET, REGLAGE, PRODUCTION],
+         desc_fr: "Mode d'exploitation — distingue un réglage d'une production",
+         desc_en: "Operating mode — distinguishes tuning from production"}
+      - {sig: BEAM,  kind: state, states: [ABSENT, PRESENT],
+         desc_fr: "Présence faisceau",
+         desc_en: "Beam presence"}

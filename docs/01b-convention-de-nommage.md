@@ -1,0 +1,132 @@
+# Étape 1b — La convention de nommage des PV
+
+*À lire avant de relire `config/pv_map.yaml`. ~10 min.*
+
+---
+
+## Pourquoi ce document existe
+
+Chez eux, il y a **80 000 PV** et **aucune jointure**. Pas de clé étrangère, pas de
+schéma relationnel entre canaux : seulement des noms. Quand un opérateur cherche la
+température de la bobine du dipôle à 3 h du matin, il ne fait pas une requête — il
+**devine le nom**. Et il doit tomber juste du premier coup.
+
+C'est pour ça que la convention de nommage est la décision la plus structurante du
+projet. Elle est aussi la plus difficile à corriger après coup : une PV renommée, ce
+sont des IHM, des scripts, des archives et des configurations qui cassent en silence.
+Dans un vrai système de contrôle, **on ne renomme pas**. On vit avec.
+
+## La règle
+
+```
+<LIGNE> : <ÉQUIPEMENT>-<NN> : <SIGNAL>[_SP|_RB]
+
+LBE     :      SOL      -01  :   I    _RB
+ │              │        │       │     │
+ │              │        │       │     └── nature : consigne ou mesure
+ │              │        │       └──────── grandeur physique
+ │              │        └──────────────── numéro d'instance, toujours sur 2 chiffres
+ │              └───────────────────────── type d'équipement, 3 à 4 lettres
+ └──────────────────────────────────────── segment de machine
+```
+
+Trois segments, jamais plus, jamais moins. Un nom se lit de gauche à droite comme on
+descend dans la machine : *où* → *quoi* → *quelle grandeur*.
+
+### Les six décisions prises, et pourquoi
+
+**1. Les noms ne sont pas écrits à la main.** `config/pv_map.yaml` décrit des
+**équipements** et leurs **signaux** ; `sim/pvmap.py` en dérive les noms. Personne ne
+peut inventer un nom hors règle, parce qu'il n'y a pas d'endroit où le taper. C'est
+exactement le rôle de leur base PostgreSQL de configuration : on décrit le matériel, le
+nommage en découle.
+
+**2. `_SP` et `_RB` sont générés ensemble ou pas du tout.** Une nature `pair` produit
+toujours les deux. Un test le vérifie. Conséquence : il est structurellement impossible
+d'avoir une consigne sans sa mesure, donc impossible de perdre la trace de l'écart
+entre ce qui a été demandé et ce que la machine a fait.
+
+**3. Une consigne ne porte jamais de seuil d'alarme.** Le code l'impose (`alarm={}` si
+le suffixe est `_SP`). Une consigne est une **décision humaine** : elle peut être
+mauvaise, elle n'est jamais « en alarme ». C'est la machine qu'on surveille, pas
+l'opérateur. Corollaire, à retenir pour l'étape 3 : `_SP` et `_RB` ne se traitent pas de
+la même façon dans un modèle — l'un est une entrée exogène, l'autre une observation.
+
+**4. Le numéro d'instance est toujours là**, même quand l'équipement est unique
+(`DIP-01`, `MACH-01`). Le jour où une deuxième source arrive, rien ne bouge. Un nom
+sans numéro est une dette qu'on paie deux ans plus tard.
+
+**5. Les grandeurs calculées sont des PV comme les autres.** `LBE:MACH-01:TRANS` et
+`:LOSS` ne correspondent à aucun matériel — elles sont produites par l'IOC à partir des
+deux ACCT. C'est volontaire et c'est **le point d'ancrage de l'étape 4** : quand le
+modèle IA écrira `LBE:MACH-01:ANOM` et `:HEALTH`, il ne fera rien de plus exotique que
+ce que fait déjà le calcul de transmission. **Le modèle devient un équipement de la
+ligne, pas un service à côté.**
+
+**6. Chaque PV porte une description en français *et* en anglais.** Un test échoue si
+l'une des deux manque. La documentation bilingue est une exigence de l'annonce ; la
+construire au fil de l'eau coûte dix secondes par PV, la rattraper à la fin coûte un
+week-end.
+
+### Un piège rencontré en écrivant le fichier
+
+La première version nommait le A/Q visé `AQ_SET`, qui devenait `LBE:MACH-01:AQ_SET_SP`.
+Deux fois le même sens dans un nom : `SET` et `_SP`. Le suffixe **est** la nature du
+signal, le radical ne doit porter que la grandeur physique. Corrigé en `AQ`, donc
+`LBE:MACH-01:AQ_SP`. Ce genre de redondance passe inaperçu à l'unité et devient
+insupportable à 80 000.
+
+## L'état de la base
+
+```
+69 PV sur 16 équipements — 15 consignes, 39 mesures, 14 états, 1 compteur
+17 PV portent des seuils d'alarme
+```
+
+Pour la voir en entier, sans rien installer d'autre que `pyyaml` :
+
+```bash
+python -m sim.pvmap        # liste, statistiques et contrôles de cohérence
+pytest tests -q            # 6 tests figent le contrat
+```
+
+---
+
+## Ce que j'attends de ta relecture
+
+Ne relis pas le YAML comme du code : relis-le comme un **opérateur** qui doit s'en
+servir, et comme un **modélisateur** qui devra l'exploiter. Sept questions, dans
+l'ordre :
+
+1. **Le test de l'opérateur.** Prends trois PV au hasard. Sais-tu dire ce qu'elles
+   mesurent sans lire la description ? Si non, le nom est mauvais, pas ta mémoire.
+
+2. **Le test de la panne.** Le vide remonte lentement sur `VAC-02` pendant six heures.
+   Quelles PV bougent, dans quel ordre ? Est-ce que la base permet de raconter cette
+   histoire, ou est-ce qu'il manque un canal ?
+
+3. **Ce qui manque pour l'étape 3.** Un modèle de détection d'anomalie doit distinguer
+   « la machine dérive » de « quelqu'un a changé un réglage ». Avec ces 69 PV, est-ce
+   possible ? Qu'est-ce qui manque encore — et faut-il que ce soit une PV, ou est-ce le
+   rôle du logbook de l'étape 2 ?
+
+4. **Les seuils.** 17 PV surveillées sur 69. Est-ce trop, pas assez ? En regardant
+   `MACH-01:TRANS` (`LOW` à 85 %, `LOLO` à 70 %) : est-ce que ces valeurs racontent une
+   machine plausible, ou est-ce que je les ai posées au hasard ? *(Indice : je les ai
+   posées au hasard. C'est à toi de décider ce qu'elles doivent valoir — et c'est
+   exactement le genre de chiffre qu'on va chercher auprès d'un exploitant.)*
+
+5. **Les états.** `MACH-01:MODE` vaut `ARRET`, `REGLAGE` ou `PRODUCTION`. Est-ce
+   suffisant pour étiqueter des données d'entraînement ? Que fait-on d'un réglage
+   interrompu à la moitié ?
+
+6. **Ce qui est en trop.** Y a-t-il des PV que tu ne saurais pas justifier en entretien ?
+   Une base minimale et défendable vaut mieux qu'une base large et floue.
+
+7. **La règle elle-même.** Trois segments, est-ce que ça tient ? Chez eux les noms sont
+   plus longs et portent le bâtiment et le sous-système. On simplifie sciemment — sais-tu
+   dire pourquoi, et sous quelle contrainte ça casserait ?
+
+Laisse tes réponses en **commentaires de la pull request**, ligne par ligne quand ça
+s'y prête. Une remarque par question suffit — ce qui compte, c'est d'avoir une opinion
+argumentée sur chacune. C'est cette conversation-là qu'on aura à l'entretien.
