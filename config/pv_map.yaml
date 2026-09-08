@@ -32,6 +32,7 @@ devices:
   # -------------------------------------------------------------------
   - id: SRC-01
     type: ecr_ion_source
+    domain: equipement
     label_fr: Source ECR 14 GHz
     label_en: 14 GHz ECR ion source
     signals:
@@ -63,6 +64,7 @@ devices:
   # -------------------------------------------------------------------
   - id: COIL-INJ
     type: source_coil
+    domain: equipement
     label_fr: Bobine de la source, côté injection
     label_en: Source coil, injection side
     signals:
@@ -72,6 +74,7 @@ devices:
 
   - id: COIL-EXT
     type: source_coil
+    domain: equipement
     label_fr: Bobine de la source, côté extraction
     label_en: Source coil, extraction side
     signals:
@@ -84,6 +87,7 @@ devices:
   # -------------------------------------------------------------------
   - id: SOL-01
     type: solenoid
+    domain: equipement
     label_fr: Solénoïde amont (avant dipôle)
     label_en: Upstream solenoid (before dipole)
     signals: &solenoid_signals
@@ -106,6 +110,7 @@ devices:
 
   - id: SOL-02
     type: solenoid
+    domain: equipement
     label_fr: Solénoïde aval (après dipôle)
     label_en: Downstream solenoid (after dipole)
     signals: *solenoid_signals
@@ -115,6 +120,7 @@ devices:
   # -------------------------------------------------------------------
   - id: DIP-01
     type: bending_magnet
+    domain: equipement
     label_fr: Dipôle d'analyse 90°
     label_en: 90° analysing dipole
     signals:
@@ -125,6 +131,7 @@ devices:
          desc_fr: "Champ magnétique mesuré dans l'entrefer",
          desc_en: "Measured magnetic field in the gap"}
       - {sig: AQ,    kind: ro,   egu: "",   value: 3.20,  lo: 1, hi: 7,    prec: 3,
+         domain: derive, from: [LBE:DIP-01:B],
          desc_fr: "Rapport masse sur charge effectivement transmis, déduit du champ",
          desc_en: "Mass-to-charge ratio actually transmitted, derived from the field"}
       - {sig: T,     kind: ro,   egu: degC, value: 38.0,  lo: 0, hi: 120,  prec: 1,
@@ -143,6 +150,7 @@ devices:
   # -------------------------------------------------------------------
   - id: STE-01
     type: steerer
+    domain: equipement
     label_fr: Correcteur horizontal/vertical
     label_en: Horizontal/vertical steerer
     signals:
@@ -161,6 +169,7 @@ devices:
   # -------------------------------------------------------------------
   - id: SLT-01
     type: slits
+    domain: equipement
     label_fr: Fentes d'analyse (plan de dispersion)
     label_en: Analysing slits (dispersion plane)
     signals:
@@ -179,6 +188,7 @@ devices:
   # -------------------------------------------------------------------
   - id: ACCT-01
     type: current_transformer
+    domain: faisceau
     label_fr: Transformateur d'intensité, sortie source
     label_en: Current transformer, source exit
     signals:
@@ -189,6 +199,7 @@ devices:
 
   - id: ACCT-02
     type: current_transformer
+    domain: faisceau
     label_fr: Transformateur d'intensité, entrée RFQ
     label_en: Current transformer, RFQ entrance
     signals:
@@ -199,18 +210,20 @@ devices:
 
   - id: FC-01
     type: faraday_cup
+    domain: faisceau
     label_fr: Cage de Faraday (interceptive)
     label_en: Faraday cup (interceptive)
     signals:
       - {sig: ITF, kind: ro, egu: uA, value: 0.0, lo: 0, hi: 2000, prec: 1,
          desc_fr: "Intensité collectée — nulle si la cage est escamotée",
          desc_en: "Collected current — zero when the cup is retracted"}
-      - {sig: POS, kind: pair, egu: "", value: 0, lo: 0, hi: 1, prec: 0,
+      - {sig: POS, kind: pair, egu: "", value: 0, lo: 0, hi: 1, prec: 0, domain: equipement,
          desc_fr: "Position de la cage : 0 = escamotée, 1 = insérée",
          desc_en: "Cup position: 0 = retracted, 1 = inserted"}
 
   - id: BPM-01
     type: beam_position_monitor
+    domain: faisceau
     label_fr: Mesure de position, avant dipôle
     label_en: Beam position monitor, before dipole
     signals: &bpm_signals
@@ -228,12 +241,14 @@ devices:
 
   - id: BPM-02
     type: beam_position_monitor
+    domain: faisceau
     label_fr: Mesure de position, après dipôle
     label_en: Beam position monitor, after dipole
     signals: *bpm_signals
 
   - id: PROF-01
     type: profile_monitor
+    domain: faisceau
     label_fr: Profileur à fil
     label_en: Wire profile monitor
     signals:
@@ -245,7 +260,7 @@ devices:
          alarm: {high: 9.0, hihi: 14.0, hsv: MINOR, hhsv: MAJOR},
          desc_fr: "Largeur verticale du faisceau (écart-type)",
          desc_en: "Vertical beam width (standard deviation)"}
-      - {sig: POS,  kind: pair, egu: "", value: 0, lo: 0, hi: 1, prec: 0,
+      - {sig: POS,  kind: pair, egu: "", value: 0, lo: 0, hi: 1, prec: 0, domain: equipement,
          desc_fr: "Position du fil : 0 = escamoté, 1 = inséré",
          desc_en: "Wire position: 0 = retracted, 1 = inserted"}
 
@@ -254,6 +269,7 @@ devices:
   # -------------------------------------------------------------------
   - id: VAC-01
     type: vacuum_gauge
+    domain: procede
     label_fr: Jauge de vide, chambre source
     label_en: Vacuum gauge, source chamber
     signals: &vac_signals
@@ -268,21 +284,23 @@ devices:
          alarm: {high: 60.0, hihi: 90.0, hsv: MINOR, hhsv: MAJOR},
          desc_fr: "Température de la chambre — sépare une fuite d'un dégazage",
          desc_en: "Chamber temperature — distinguishes a leak from outgassing"}
-      - {sig: VALVE, kind: state, states: [FERMEE, OUVERTE, MOUVEMENT, DEFAUT],
+      - {sig: VALVE, kind: state, states: [FERMEE, OUVERTE, MOUVEMENT, DEFAUT], domain: equipement,
          desc_fr: "Position de la vanne de secteur",
          desc_en: "Sector valve position"}
-      - {sig: STATE, kind: state, states: [ARRET, POMPAGE, NOMINAL, DEFAUT],
+      - {sig: STATE, kind: state, states: [ARRET, POMPAGE, NOMINAL, DEFAUT], domain: equipement,
          desc_fr: "État du groupe de pompage",
          desc_en: "Pumping group state"}
 
   - id: VAC-02
     type: vacuum_gauge
+    domain: procede
     label_fr: Jauge de vide, chambre du dipôle
     label_en: Vacuum gauge, dipole chamber
     signals: *vac_signals
 
   - id: VAC-03
     type: vacuum_gauge
+    domain: procede
     label_fr: Jauge de vide, fin de ligne
     label_en: Vacuum gauge, end of line
     signals: *vac_signals
@@ -295,23 +313,31 @@ devices:
   # -------------------------------------------------------------------
   - id: MACH-01
     type: derived
+    domain: derive
     label_fr: Grandeurs machine
     label_en: Machine-level quantities
     signals:
       - {sig: TRANS, kind: ro, egu: "%", value: 92.0, lo: 0, hi: 100, prec: 2,
+         from: [LBE:ACCT-01:ITF, LBE:ACCT-02:ITF],
          alarm: {lolo: 70.0, low: 85.0, llsv: MAJOR, lsv: MINOR},
          desc_fr: "Transmission de la ligne = ACCT-02 / ACCT-01",
          desc_en: "Line transmission = ACCT-02 / ACCT-01"}
       - {sig: LOSS,  kind: ro, egu: uA, value: 65.0, lo: 0, hi: 2000, prec: 1,
+         from: [LBE:ACCT-01:ITF, LBE:ACCT-02:ITF],
          alarm: {high: 150.0, hihi: 300.0, hsv: MINOR, hhsv: MAJOR},
          desc_fr: "Perte de faisceau = ACCT-01 − ACCT-02",
          desc_en: "Beam loss = ACCT-01 − ACCT-02"}
-      - {sig: AQ,     kind: pair, egu: "", value: 3.20, lo: 1, hi: 7, prec: 3,
+      - {sig: AQ,     kind: pair, egu: "", value: 3.20, lo: 1, hi: 7, prec: 3, domain: contexte,
          desc_fr: "Rapport A/Q visé par le réglage en cours",
          desc_en: "Target mass-to-charge ratio for the current tuning"}
-      - {sig: MODE,  kind: state, states: [ARRET, REGLAGE, PRODUCTION],
+      - {sig: MODE,  kind: state, states: [ARRET, REGLAGE, PRODUCTION], domain: contexte,
          desc_fr: "Mode d'exploitation — distingue un réglage d'une production",
          desc_en: "Operating mode — distinguishes tuning from production"}
-      - {sig: BEAM,  kind: state, states: [ABSENT, PRESENT],
+      - {sig: BEAM,  kind: state, states: [ABSENT, PRESENT], from: [LBE:ACCT-01:ITF],
          desc_fr: "Présence faisceau",
          desc_en: "Beam presence"}
+      # Ajouté en revue, question 3 : le contexte sans lequel aucune campagne
+      # n'est comparable à une autre. Change sans qu'aucune consigne ne bouge.
+      - {sig: SPECIES, kind: text, domain: contexte, value: "16O5+",
+         desc_fr: "Espèce ionique produite, notation isotope et état de charge",
+         desc_en: "Ion species being produced, isotope and charge state notation"}

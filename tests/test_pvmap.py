@@ -2,7 +2,7 @@
 
 import pytest
 
-from sim.pvmap import check, expand
+from sim.pvmap import DOMAINS, check, expand
 
 
 @pytest.fixture(scope="module")
@@ -53,4 +53,27 @@ def test_les_grandeurs_critiques_sont_surveillees(pvs):
 
 def test_la_taille_de_la_base_est_stable(pvs):
     """Garde-fou : un ajout non intentionnel doit se voir en revue."""
-    assert len(pvs) == 75
+    assert len(pvs) == 76
+
+
+def test_chaque_canal_declare_son_domaine(pvs):
+    for pv in pvs:
+        assert pv.domain in DOMAINS, f"{pv.name} : domaine {pv.domain!r}"
+
+
+def test_les_canaux_derives_citent_leurs_sources(pvs):
+    """Un canal dérivé n'est pas un témoin indépendant : il doit dire
+    de quoi il est calculé, pour qu'un modèle ne le compte pas deux fois."""
+    noms = {pv.name for pv in pvs}
+    derives = [pv for pv in pvs if pv.domain == "derive"]
+    assert derives, "aucun canal dérivé dans la base"
+    for pv in derives:
+        assert pv.derived_from, f"{pv.name} ne cite aucune source"
+        for source in pv.derived_from:
+            assert source in noms
+
+
+def test_un_canal_d_equipement_ne_derive_de_rien(pvs):
+    for pv in pvs:
+        if pv.domain == "equipement":
+            assert not pv.derived_from

@@ -98,8 +98,9 @@ insupportable à 80 000.
 ## L'état de la base
 
 ```
-75 PV sur 18 équipements — 15 consignes, 42 mesures, 17 états, 1 compteur
+76 PV sur 18 équipements — 15 consignes, 42 mesures, 17 états, 1 compteur, 1 contexte
 20 PV portent des seuils d'alarme
+domaines — 51 equipement, 11 faisceau, 6 procede, 4 derive, 4 contexte
 ```
 
 Pour la voir en entier, sans rien installer d'autre que `pyyaml` :
@@ -223,3 +224,51 @@ bout en bout : donc simulable à l'étape 1, et détectable à l'étape 3.
 de la revue, n'est pas un canal de mesure mais une **sortie de modèle**. Elle sera
 publiée à l'étape 4 sous `LBE:VAC-02:P_PRED`, à côté de la mesure. C'est le motif
 directeur du projet — le modèle publie ses sorties comme n'importe quel équipement.
+
+### Question 3 — les étiquettes — 8 septembre 2026
+
+Question posée : à quoi sert le logbook, si les quinze `_SP` disent déjà quand quelqu'un
+est intervenu ?
+
+**Deux points dégagés en revue, à garder pour l'entretien.**
+
+*Un changement de consigne sans effet est un résultat.* Le même « rien ne s'est passé »
+recouvre trois situations distinctes : le réglage était dans une zone plate (le
+paramètre n'a pas d'influence à cet endroit), l'actionneur a suivi mais pas le faisceau
+(`_RB` bouge, `TRANS` non → défaut en aval), ou l'actionneur n'a pas suivi (`_SP` bouge,
+`_RB` non → panne d'alimentation).
+
+*Une consigne est une intervention, pas une observation.* C'est de l'expérimentation.
+Une fuite de vide et un désaccord de solénoïde produisent la même chute de transmission
+dans des données observationnelles ; seul le fait que quelqu'un ait **bougé** le
+solénoïde permet d'attribuer l'effet. Les `_SP` fournissent donc des milliers de petites
+expériences déjà faites et déjà horodatées — un actif rare pour un jeu de données
+industriel.
+
+**Ce que les `_SP` ne diront jamais.** Ouvrir une vanne, changer une bouteille de gaz,
+étuver une chambre : des actes physiques sans consigne. Remplacer une alimentation ou
+recalibrer une sonde : consignes identiques avant et après, machine différente. Décider
+de **ne rien faire** pendant une dérive : une décision invisible. Et l'instant où
+l'opérateur juge le réglage terminé et accepté — cette frontière définit ce que
+« nominal » veut dire à l'entraînement, et aucune PV ne la porte.
+
+Une consigne dit **quoi**, jamais **pourquoi**, jamais **si le résultat a été accepté**.
+D'où `ts_debut`/`ts_fin` dans le schéma du logbook — une intervention a une durée
+qu'aucune transition ne donne — et d'où la capture automatique, qui transforme chaque
+changement de consigne en expérience exploitable sans rien demander à personne.
+
+**Ajouts décidés :**
+
+- **`LBE:MACH-01:SPECIES`** — l'espèce ionique produite. `AQ_SP` à 3,2 peut correspondre
+  à plusieurs ions ; changer d'espèce change tout le comportement de la ligne sans
+  qu'aucune consigne ne bouge. Sans ce canal, aucune campagne n'est comparable à une
+  autre. La base passe à **76 PV**.
+- **Le champ `domain`** sur chaque signal, avec `from:` pour les canaux dérivés. Trois
+  tests l'imposent. Répartition : 51 `equipement`, 11 `faisceau`, 6 `procede`,
+  4 `derive`, 4 `contexte`.
+
+Ce dernier chiffre mérite d'être regardé en face : **onze canaux de faisceau seulement**.
+C'est sur eux, et sur les six canaux de procédé, que porte toute la détection d'anomalie.
+Les cinquante et un canaux d'équipement sont des entrées, pas des observations —
+les confondre reviendrait à demander au modèle de prédire ce que les opérateurs vont
+faire.

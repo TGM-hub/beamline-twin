@@ -22,7 +22,14 @@ KIND_SUFFIXES: dict[str, tuple[str, ...]] = {
     "ro": ("",),
     "state": ("",),
     "counter": ("",),
+    "text": ("",),
 }
+
+#: De quoi un canal parle. Décidé en revue (question 2) : un incident faisceau
+#: ne se propage que dans `faisceau` et `derive` ; un canal `equipement` ne
+#: bouge que si quelqu'un ou un défaut agit sur le matériel. La causalité est
+#: donc connue d'avance, et à sens unique.
+DOMAINS = frozenset({"equipement", "procede", "faisceau", "derive", "contexte"})
 
 #: Type de record EPICS retenu pour chaque nature de signal.
 KIND_RECORDS: dict[str, dict[str, str]] = {
@@ -30,6 +37,7 @@ KIND_RECORDS: dict[str, dict[str, str]] = {
     "ro": {"": "ai"},
     "state": {"": "mbbi"},
     "counter": {"": "longin"},
+    "text": {"": "stringin"},
 }
 
 
@@ -49,6 +57,8 @@ class PV:
     lo: float | None = None
     hi: float | None = None
     states: tuple[str, ...] = ()
+    domain: str = ""
+    derived_from: tuple[str, ...] = ()
     alarm: dict[str, Any] = field(default_factory=dict)
     desc_fr: str = ""
     desc_en: str = ""
@@ -57,11 +67,18 @@ class PV:
     def is_setpoint(self) -> bool:
         return self.role == "setpoint"
 
+    @property
+    def is_independent(self) -> bool:
+        """Un canal dérivé n'est pas un témoin : il répète ce que disent
+        les canaux dont il est calculé."""
+        return self.domain != "derive"
+
 
 def _role(kind: str, suffix: str) -> str:
     if kind == "pair":
         return "setpoint" if suffix == "_SP" else "readback"
-    return {"ro": "readback", "state": "state", "counter": "counter"}[kind]
+    return {"ro": "readback", "state": "state",
+            "counter": "counter", "text": "context"}[kind]
 
 
 def load(path: str | Path = DEFAULT_MAP) -> dict[str, Any]:
@@ -101,6 +118,8 @@ def expand(spec: dict[str, Any] | None = None) -> list[PV]:
                         lo=signal.get("lo"),
                         hi=signal.get("hi"),
                         states=tuple(signal.get("states", ())),
+                        domain=signal.get("domain", device.get("domain", "")),
+                        derived_from=tuple(signal.get("from", ())),
                         # Une consigne ne porte pas d'alarme : c'est une
                         # décision humaine, pas un état de la machine.
                         alarm={} if suffix == "_SP" else signal.get("alarm", {}),
@@ -129,6 +148,12 @@ def check(pvs: list[PV]) -> list[str]:
             problems.append(f"{pv.name} : description bilingue incomplète")
         if pv.role == "state" and not pv.states:
             problems.append(f"{pv.name} : aucun état déclaré")
+        if pv.domain not in DOMAINS:
+            problems.append(f"{pv.name} : domaine absent ou inconnu ({pv.domain!r})")
+        if pv.domain == "derive" and not pv.derived_from:
+            problems.append(f"{pv.name} : canal dérivé sans `from:`")
+        if pv.domain != "derive" and pv.derived_from:
+            problems.append(f"{pv.name} : `from:` sur un canal non dérivé")
 
         a = pv.alarm
         if a:
@@ -141,8 +166,13 @@ def check(pvs: list[PV]) -> list[str]:
             if pv.hi is not None and any(v > pv.hi for v in present):
                 problems.append(f"{pv.name} : seuil au-dessus de la borne haute")
 
-    # Toute consigne doit avoir sa mesure en vis-à-vis.
     names = {pv.name for pv in pvs}
+    for pv in pvs:
+        for source in pv.derived_from:
+            if source not in names:
+                problems.append(f"{pv.name} : dérivé de {source}, qui n'existe pas")
+
+    # Toute consigne doit avoir sa mesure en vis-à-vis.
     for pv in pvs:
         if pv.is_setpoint and pv.name.replace("_SP", "_RB") not in names:
             problems.append(f"{pv.name} : pas de mesure `_RB` correspondante")
@@ -155,14 +185,19 @@ def main() -> int:
     width = max(len(pv.name) for pv in pvs)
     for pv in pvs:
         flag = "!" if pv.alarm else " "
-        print(f"{flag} {pv.name:<{width}}  {pv.record:<7} {pv.egu:<5} {pv.desc_fr}")
+        print(f"{flag} {pv.name:<{width}}  {pv.record:<7} {pv.domain:<11} "
+              f"{pv.egu:<5} {pv.desc_fr}")
 
     problems = check(pvs)
     roles = {r: sum(1 for pv in pvs if pv.role == r) for r in
-             ("setpoint", "readback", "state", "counter")}
+             ("setpoint", "readback", "state", "counter", "context")}
     print(f"\n{len(pvs)} PV sur {len({pv.device for pv in pvs})} équipements — "
           + ", ".join(f"{n} {r}" for r, n in roles.items()))
     print(f"{sum(1 for pv in pvs if pv.alarm)} PV portent des seuils d'alarme")
+    domains = {d: sum(1 for pv in pvs if pv.domain == d) for d in sorted(DOMAINS)}
+    print("domaines — " + ", ".join(f"{n} {d}" for d, n in domains.items()))
+    print(f"{sum(1 for pv in pvs if not pv.is_independent)} canaux dérivés : "
+          "à ne jamais compter comme témoins indépendants")
 
     if problems:
         print(f"\n{len(problems)} anomalie(s) :")
