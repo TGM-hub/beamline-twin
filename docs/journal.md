@@ -35,3 +35,31 @@
   questions de revue), `docs/02-cours-historian-et-logbook.md`,
   `docs/fiches-revision.md` (28 questions).
 - Dépôt à publier sur GitHub en public ; la revue du `pv_map` se fera en pull request.
+
+## Séance 3 — 8 septembre 2026 — Revue de la base de PV, en conversation
+
+Quatre des sept questions de revue traitées. La base passe de **69 à 77 PV** et gagne
+deux champs de conception. Journal détaillé à la fin de `docs/01b`.
+
+- **Q1** — `COIL_EXT_I_RB` illisible : les bobines de la source deviennent des
+  équipements (`COIL-INJ`, `COIL-EXT`). L'instance peut être un mnémonique.
+- **Q2** — scénario de fuite de vide : ajout des vannes de secteur et des températures
+  de chambre. Distinction dégagée entre **canaux d'équipement et canaux de faisceau**,
+  et piège des canaux dérivés qui simulent des témoins indépendants.
+- **Q3** — ajout de `SPECIES` et du champ `domain` avec `from:` pour les dérivés.
+- **Q4** — les seuils : un seuil absolu sur une différence est aveugle, et `TRANS` et
+  `LOSS` alarmaient à quatre instants pour un seul événement. Champ `alarm.kind`
+  (`protection` / `exploitation`), `LOSS` perd son alarme au profit de `LOSS_W` en watts.
+- **Q5** — `MODE` déclaré par l'opérateur ne suffit pas à étiqueter : le régime doit être
+  **calculé** (faisceau présent × consigne bougée récemment). Un réglage interrompu reste
+  `INDETERMINE` et sort de l'entraînement.
+- **Q6** — laissée ouverte : décider ce qui est en trop suppose d'avoir vu les courbes.
+
+**Erreur corrigée en séance :** la perte de faisceau n'active rien à 40 keV. Puissance
+faisceau ≈ 32 W ; le problème est thermique et le dégazage qui s'ensuit.
+
+**Changement de méthode, à la demande de TGM.** Une journée entière de conception sans
+rien exécuter, c'est trop. Le simulateur et l'IOC sont écrits en semaine et relus
+morceau par morceau ; la feuille de route passe en **tranche verticale** — une chaîne
+complète et laide au jalon 1, épaissie ensuite. Et les données réelles arrivent avant le
+simulateur, pas après.
