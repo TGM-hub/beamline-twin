@@ -53,4 +53,4 @@ def test_les_grandeurs_critiques_sont_surveillees(pvs):
 
 def test_la_taille_de_la_base_est_stable(pvs):
     """Garde-fou : un ajout non intentionnel doit se voir en revue."""
-    assert len(pvs) == 69
+    assert len(pvs) == 75

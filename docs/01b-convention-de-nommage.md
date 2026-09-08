@@ -98,8 +98,8 @@ insupportable à 80 000.
 ## L'état de la base
 
 ```
-69 PV sur 18 équipements — 15 consignes, 39 mesures, 14 états, 1 compteur
-17 PV portent des seuils d'alarme
+75 PV sur 18 équipements — 15 consignes, 42 mesures, 17 états, 1 compteur
+20 PV portent des seuils d'alarme
 ```
 
 Pour la voir en entier, sans rien installer d'autre que `pyyaml` :
@@ -179,3 +179,47 @@ perte de faisceau est un enjeu de radioprotection (échauffement, activation), p
 rendement. Nuance de vocabulaire relevée au passage : `LOSS` est une mesure qui *porte*
 des seuils, pas une alarme. L'alarme est un état du record (`.SEVR`), il n'existe pas de
 PV d'alarme à côté des mesures.
+
+### Question 2 — le test de la panne — 8 septembre 2026
+
+Scénario soumis : montée lente de `VAC-02:P` sur six heures, sans intervention.
+
+**Ce que la revue a établi.** Bougent : `VAC-02:P`, puis `ACCT-02:ITF`, `MACH-01:TRANS`
+et `MACH-01:LOSS`. Ne bougent pas : `ACCT-01:ITF` (en amont de la perte),
+`BPM-02:X` et `PROF-01:SIGX` (le faisceau transmis reste centré, il est seulement moins
+nombreux), et surtout `SRC-01:HT_I`, `DIP-01:B`, `SOL-01:I_RB`.
+
+**Distinction dégagée, et qui vaut pour tout le projet :**
+
+> **Canaux d'équipement** contre **canaux de faisceau.** Un incident faisceau ne se
+> propage que dans les seconds. Un canal d'équipement — le champ d'un aimant, le courant
+> d'une alimentation — ne bouge que si quelqu'un ou un défaut agit sur l'équipement.
+> Le champ d'un dipôle suit son alimentation, pas le faisceau qui le traverse.
+
+Conséquence pour l'étape 3 : la causalité est **à sens unique et connue d'avance**. Une
+corrélation entre `SOL-01:I_RB` et `MACH-01:TRANS` ne peut aller que du solénoïde vers
+la transmission. C'est une contrainte structurelle offerte par la topologie de la
+machine, que peu de jeux de données industriels fournissent.
+
+**Piège relevé :** `ACCT-02:ITF`, `TRANS` et `LOSS` ne se succèdent pas — c'est le même
+événement, les deux dernières étant calculées à partir de la première. Un modèle
+multi-canaux y verra trois confirmations indépendantes là où il n'y a qu'un seul témoin.
+Les canaux dérivés devront être marqués comme tels avant tout entraînement.
+
+**Manques identifiés, et suites données :**
+
+| Manque | Décision |
+|---|---|
+| Comparer les trois jauges pour localiser (local ou pompage) | déjà possible, `VAC-01/02/03` existent |
+| Écarter une dérive du débit de gaz | déjà possible, `SRC-01:GAS_Q_RB` existe |
+| Position des vannes de secteur | **ajouté** — `LBE:VAC-0N:VALVE` |
+| Séparer une fuite d'un dégazage | **ajouté** — `LBE:VAC-0N:T`, température de chambre |
+| Savoir si quelqu'un a ouvert quelque chose il y a six heures | aucune PV ne le dira — c'est l'objet de l'étape 2 |
+
+La base passe de 69 à **75 PV**. Le scénario de la fuite est désormais racontable de
+bout en bout : donc simulable à l'étape 1, et détectable à l'étape 3.
+
+**À noter :** l'idée d'une *pression attendue* à comparer à la pression observée, sortie
+de la revue, n'est pas un canal de mesure mais une **sortie de modèle**. Elle sera
+publiée à l'étape 4 sous `LBE:VAC-02:P_PRED`, à côté de la mesure. C'est le motif
+directeur du projet — le modèle publie ses sorties comme n'importe quel équipement.

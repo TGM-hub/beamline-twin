@@ -261,6 +261,16 @@ devices:
          alarm: {high: 1.0e-7, hihi: 1.0e-6, hsv: MINOR, hhsv: MAJOR},
          desc_fr: "Pression résiduelle — une remontée dégrade la transmission",
          desc_en: "Residual pressure — a rise degrades transmission"}
+      # Ajoutés en revue, question 2 : sans eux, une montée lente de pression
+      # est indiscernable entre une fuite et un dégazage, et l'opérateur ne
+      # peut pas vérifier l'état des vannes. Voir docs/01b, journal de revue.
+      - {sig: T,     kind: ro, egu: degC, value: 24.0, lo: 0, hi: 250, prec: 1,
+         alarm: {high: 60.0, hihi: 90.0, hsv: MINOR, hhsv: MAJOR},
+         desc_fr: "Température de la chambre — sépare une fuite d'un dégazage",
+         desc_en: "Chamber temperature — distinguishes a leak from outgassing"}
+      - {sig: VALVE, kind: state, states: [FERMEE, OUVERTE, MOUVEMENT, DEFAUT],
+         desc_fr: "Position de la vanne de secteur",
+         desc_en: "Sector valve position"}
       - {sig: STATE, kind: state, states: [ARRET, POMPAGE, NOMINAL, DEFAUT],
          desc_fr: "État du groupe de pompage",
          desc_en: "Pumping group state"}
