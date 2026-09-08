@@ -19,16 +19,24 @@ Dans un vrai système de contrôle, **on ne renomme pas**. On vit avec.
 ## La règle
 
 ```
-<LIGNE> : <ÉQUIPEMENT>-<NN> : <SIGNAL>[_SP|_RB]
+<LIGNE> : <ÉQUIPEMENT>-<INSTANCE> : <SIGNAL>[_SP|_RB]
 
-LBE     :      SOL      -01  :   I    _RB
- │              │        │       │     │
- │              │        │       │     └── nature : consigne ou mesure
- │              │        │       └──────── grandeur physique
- │              │        └──────────────── numéro d'instance, toujours sur 2 chiffres
- │              └───────────────────────── type d'équipement, 3 à 4 lettres
- └──────────────────────────────────────── segment de machine
+LBE     :      SOL      -01      :   I    _RB
+ │              │        │           │     │
+ │              │        │           │     └── nature : consigne ou mesure
+ │              │        │           └──────── grandeur physique, elle seule
+ │              │        └──────────────────── instance (voir ci-dessous)
+ │              └───────────────────────────── type d'équipement, 3 à 4 lettres
+ └──────────────────────────────────────────── segment de machine
 ```
+
+**L'instance est un numéro à deux chiffres quand les exemplaires se distinguent par
+leur position le long de la ligne** — `SOL-01` puis `SOL-02`, le numéro dit l'ordre.
+**Elle est un mnémonique court quand la distinction est fonctionnelle et non
+positionnelle** : les deux bobines de la source ECR sont `COIL-INJ` et `COIL-EXT`,
+côté injection et côté extraction. Les numéroter `01` et `02` obligerait à mémoriser
+une correspondance arbitraire ; c'est le genre de dette qu'un opérateur paie à 3 h du
+matin.
 
 Trois segments, jamais plus, jamais moins. Un nom se lit de gauche à droite comme on
 descend dans la machine : *où* → *quoi* → *quelle grandeur*.
@@ -52,9 +60,20 @@ mauvaise, elle n'est jamais « en alarme ». C'est la machine qu'on surveille, p
 l'opérateur. Corollaire, à retenir pour l'étape 3 : `_SP` et `_RB` ne se traitent pas de
 la même façon dans un modèle — l'un est une entrée exogène, l'autre une observation.
 
-**4. Le numéro d'instance est toujours là**, même quand l'équipement est unique
-(`DIP-01`, `MACH-01`). Le jour où une deuxième source arrive, rien ne bouge. Un nom
-sans numéro est une dette qu'on paie deux ans plus tard.
+**4. L'instance est toujours là**, même quand l'équipement est unique (`DIP-01`,
+`MACH-01`). Le jour où une deuxième source arrive, rien ne bouge. Un nom sans instance
+est une dette qu'on paie deux ans plus tard.
+
+**4bis. Un sous-équipement devient un équipement.** La source ECR contient deux
+bobines, chacune avec son alimentation, sa consigne et son défaut. Les faire tenir dans
+le champ `SIGNAL` donnait `LBE:SRC-01:COIL_EXT_I_RB` — quatre concepts empilés dans un
+segment censé n'en porter qu'un. Elles sont donc des équipements de plein droit :
+`LBE:COIL-INJ:I_RB`. La règle des trois segments tient, au prix d'un lien
+source↔bobines qui vit dans le YAML et non dans le nom. C'est un arbitrage : la
+lisibilité du nom contre l'expressivité de la hiérarchie. Le GANIL a tranché dans
+l'autre sens — leurs noms sont plus longs et portent bâtiment et sous-système — parce
+qu'à 80 000 canaux et 3 000 équipements, la hiérarchie ne tient plus dans un fichier
+qu'on lit d'un bloc.
 
 **5. Les grandeurs calculées sont des PV comme les autres.** `LBE:MACH-01:TRANS` et
 `:LOSS` ne correspondent à aucun matériel — elles sont produites par l'IOC à partir des
@@ -79,7 +98,7 @@ insupportable à 80 000.
 ## L'état de la base
 
 ```
-69 PV sur 16 équipements — 15 consignes, 39 mesures, 14 états, 1 compteur
+69 PV sur 18 équipements — 15 consignes, 39 mesures, 14 états, 1 compteur
 17 PV portent des seuils d'alarme
 ```
 
@@ -130,3 +149,33 @@ l'ordre :
 Laisse tes réponses en **commentaires de la pull request**, ligne par ligne quand ça
 s'y prête. Une remarque par question suffit — ce qui compte, c'est d'avoir une opinion
 argumentée sur chacune. C'est cette conversation-là qu'on aura à l'entretien.
+
+
+---
+
+## Journal de la revue
+
+### Question 1 — le test de l'opérateur — 8 septembre 2026
+
+Trois PV soumises à froid, sans accès au YAML.
+
+| PV | Lue comme | Verdict |
+|---|---|---|
+| `LBE:SRC-01:COIL_EXT_I_RB` | « isolation, ou montage d'essai » | **nom défectueux — corrigé** |
+| `LBE:DIP-01:AQ` | non reconnue | nom conservé |
+| `LBE:MACH-01:LOSS` | « une alarme importante » | nom validé |
+
+**`COIL_EXT`** : `EXT` se lit *externe* autant qu'*extraction*, et le champ `SIGNAL`
+empilait sous-équipement, instance, grandeur et nature. Corrigé en `LBE:COIL-EXT:I_RB`
+(décision 4bis ci-dessus).
+
+**`AQ`** : le nom est conservé. La lecture a échoué par méconnaissance du domaine, pas
+par défaut de nommage — un opérateur d'accélérateur raisonne en A/Q en permanence. Un
+nom se juge par rapport à son utilisateur ; confondre « je ne comprends pas » et « c'est
+mal nommé » ferait renommer la moitié de la base au profit de personne.
+
+**`LOSS`** : bonne réponse à la question des 3 h du matin, pour la bonne raison — la
+perte de faisceau est un enjeu de radioprotection (échauffement, activation), pas de
+rendement. Nuance de vocabulaire relevée au passage : `LOSS` est une mesure qui *porte*
+des seuils, pas une alarme. L'alarme est un état du record (`.SEVR`), il n'existe pas de
+PV d'alarme à côté des mesures.

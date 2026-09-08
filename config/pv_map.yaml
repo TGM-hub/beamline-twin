@@ -48,18 +48,36 @@ devices:
          alarm: {high: 8.0, hihi: 12.0, hsv: MINOR, hhsv: MAJOR},
          desc_fr: "Courant débité par l'alimentation HT — un pic signale un claquage",
          desc_en: "HV power supply drain current — a spike indicates a spark"}
-      - {sig: COIL_INJ_I,  kind: pair,    egu: A,    value: 620.0,  lo: 0,    hi: 1000, prec: 1,
-         desc_fr: "Courant de la bobine côté injection",
-         desc_en: "Injection-side coil current"}
-      - {sig: COIL_EXT_I,  kind: pair,    egu: A,    value: 580.0,  lo: 0,    hi: 1000, prec: 1,
-         desc_fr: "Courant de la bobine côté extraction",
-         desc_en: "Extraction-side coil current"}
       - {sig: SPARK_CNT,   kind: counter, egu: "",   value: 0,
          desc_fr: "Nombre cumulé de claquages haute tension depuis le démarrage",
          desc_en: "Cumulative count of high voltage sparks since startup"}
       - {sig: STATE,       kind: state,   states: [ARRET, ATTENTE, MARCHE, DEFAUT],
          desc_fr: "État de la source",
          desc_en: "Ion source state"}
+
+  # -------------------------------------------------------------------
+  # 1bis. Bobines de la source — deux exemplaires NON interchangeables.
+  #       Elles portent un mnémonique d'instance (INJ / EXT) et non un
+  #       numéro : leur différence est fonctionnelle, pas positionnelle.
+  #       Décidé en revue, question 1 — voir docs/01b.
+  # -------------------------------------------------------------------
+  - id: COIL-INJ
+    type: source_coil
+    label_fr: Bobine de la source, côté injection
+    label_en: Source coil, injection side
+    signals:
+      - {sig: I, kind: pair, egu: A, value: 620.0, lo: 0, hi: 1000, prec: 1,
+         desc_fr: "Courant d'alimentation de la bobine côté injection",
+         desc_en: "Injection-side coil power supply current"}
+
+  - id: COIL-EXT
+    type: source_coil
+    label_fr: Bobine de la source, côté extraction
+    label_en: Source coil, extraction side
+    signals:
+      - {sig: I, kind: pair, egu: A, value: 580.0, lo: 0, hi: 1000, prec: 1,
+         desc_fr: "Courant d'alimentation de la bobine côté extraction",
+         desc_en: "Extraction-side coil power supply current"}
 
   # -------------------------------------------------------------------
   # 2. Solénoïdes — focalisation basse énergie
