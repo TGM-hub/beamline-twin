@@ -31,6 +31,12 @@ KIND_SUFFIXES: dict[str, tuple[str, ...]] = {
 #: donc connue d'avance, et à sens unique.
 DOMAINS = frozenset({"equipement", "procede", "faisceau", "derive", "contexte"})
 
+#: Sur quoi un seuil se justifie. Décidé en revue (question 4) : un seuil de
+#: protection découle de ce que le matériel supporte — il est fixe et sa place
+#: est dans cette base. Un seuil d'exploitation découle de ce que la campagne
+#: du jour attend — il n'est ici qu'une valeur par défaut.
+ALARM_KINDS = frozenset({"protection", "exploitation"})
+
 #: Type de record EPICS retenu pour chaque nature de signal.
 KIND_RECORDS: dict[str, dict[str, str]] = {
     "pair": {"_SP": "ao", "_RB": "ai"},
@@ -154,6 +160,9 @@ def check(pvs: list[PV]) -> list[str]:
             problems.append(f"{pv.name} : canal dérivé sans `from:`")
         if pv.domain != "derive" and pv.derived_from:
             problems.append(f"{pv.name} : `from:` sur un canal non dérivé")
+        if pv.alarm and pv.alarm.get("kind") not in ALARM_KINDS:
+            problems.append(f"{pv.name} : seuil sans justification "
+                            "(`kind: protection` ou `exploitation`)")
 
         a = pv.alarm
         if a:
@@ -193,7 +202,10 @@ def main() -> int:
              ("setpoint", "readback", "state", "counter", "context")}
     print(f"\n{len(pvs)} PV sur {len({pv.device for pv in pvs})} équipements — "
           + ", ".join(f"{n} {r}" for r, n in roles.items()))
-    print(f"{sum(1 for pv in pvs if pv.alarm)} PV portent des seuils d'alarme")
+    kinds = {k: sum(1 for pv in pvs if pv.alarm.get("kind") == k)
+             for k in sorted(ALARM_KINDS)}
+    print(f"{sum(1 for pv in pvs if pv.alarm)} PV portent des seuils d'alarme — "
+          + ", ".join(f"{n} {k}" for k, n in kinds.items()))
     domains = {d: sum(1 for pv in pvs if pv.domain == d) for d in sorted(DOMAINS)}
     print("domaines — " + ", ".join(f"{n} {d}" for d, n in domains.items()))
     print(f"{sum(1 for pv in pvs if not pv.is_independent)} canaux dérivés : "

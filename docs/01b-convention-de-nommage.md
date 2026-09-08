@@ -98,9 +98,9 @@ insupportable à 80 000.
 ## L'état de la base
 
 ```
-76 PV sur 18 équipements — 15 consignes, 42 mesures, 17 états, 1 compteur, 1 contexte
-20 PV portent des seuils d'alarme
-domaines — 51 equipement, 11 faisceau, 6 procede, 4 derive, 4 contexte
+77 PV sur 18 équipements — 15 consignes, 43 mesures, 17 états, 1 compteur, 1 contexte
+20 PV portent des seuils d'alarme — 11 protection, 9 exploitation
+domaines — 51 equipement, 11 faisceau, 6 procede, 5 derive, 4 contexte
 ```
 
 Pour la voir en entier, sans rien installer d'autre que `pyyaml` :
@@ -272,3 +272,59 @@ C'est sur eux, et sur les six canaux de procédé, que porte toute la détection
 Les cinquante et un canaux d'équipement sont des entrées, pas des observations —
 les confondre reviendrait à demander au modèle de prédire ce que les opérateurs vont
 faire.
+
+### Question 4 — les seuils — 8 septembre 2026
+
+Les seuils de la première version étaient posés au jugé. La revue en a tiré deux
+défauts, dont l'un invalide franchement la conception.
+
+**Défaut 1 — un seuil absolu sur une différence est aveugle.** `LOSS = ACCT-01 −
+ACCT-02` portait `HIGH` à 150 µA et `HIHI` à 300 µA. Si la source faiblit à 200 µA, la
+ligne peut perdre **100 % du faisceau** sans qu'aucune alarme ne parte : la perte vaut
+200 µA, sous le seuil. Le seuil devenait faux aussi dès qu'on touchait à la tension
+d'extraction.
+
+**Défaut 2 — deux alarmes pour un seul événement.** `TRANS` et `LOSS` sont dérivées des
+deux mêmes ACCT. Au nominal, `TRANS` passait MINOR à 122 µA de perte quand `LOSS`
+attendait 150 ; MAJOR à 244 µA quand `LOSS` attendait 300. Quatre déclenchements
+décalés pour une seule cause. C'est ainsi qu'on apprend aux opérateurs à ignorer les
+alarmes.
+
+**La correction n'est pas de les aligner** — les deux canaux ne répondent pas à la même
+question, et c'est la distinction structurante de cette revue :
+
+> **Seuil de protection** : découle de ce que le **matériel** supporte. Fixe, physique,
+> défendable devant n'importe qui. Sa place est dans la base de PV.
+>
+> **Seuil d'exploitation** : découle de ce que la **campagne du jour** attend. 85 % de
+> transmission peut être excellent pour un utilisateur et inacceptable pour le suivant.
+> Le coder en dur dans la configuration matérielle, c'est faire passer une décision du
+> jour pour une propriété de l'équipement.
+
+**Décisions appliquées :**
+
+- Champ **`alarm.kind`** (`protection` | `exploitation`) obligatoire, imposé par un test.
+  Répartition : 11 protection, 9 exploitation.
+- `LOSS` **perd son alarme** et redevient une mesure brute.
+- **`LBE:MACH-01:LOSS_W`** ajoutée, dérivée de `LOSS` et de `SRC-01:HT_U_RB` : la
+  puissance déposée, en watts, avec `HIGH` à 6 W et `HIHI` à 12 W. C'est la seule
+  grandeur que la paroi comprenne, et le seuil reste juste quand la tension change.
+- Les seuils `exploitation` restent dans le YAML comme **valeurs par défaut**,
+  surchargeables par campagne à l'étape 2 — à côté des entrées de logbook, pas dans la
+  configuration matérielle.
+
+La base passe à **77 PV**.
+
+**Erreur corrigée en séance.** Il avait été dit que la perte de faisceau « active les
+matériaux » sur la LBE. C'est faux : l'activation suppose des réactions nucléaires, donc
+des énergies de l'ordre du MeV par nucléon. Ici un ¹⁶O⁵⁺ extrait à 40 kV emporte 200 keV
+au total, soit 12,5 keV/u — deux ordres de grandeur trop bas. La puissance faisceau vaut
+`P = I × U = 812 µA × 40 kV ≈ 32 W`. Ce que la perte produit à cette énergie, c'est de
+l'échauffement local, de la pulvérisation, et du **dégazage** : la paroi chauffée relâche
+du gaz, la pression monte, la transmission baisse, donc la perte augmente. Une boucle qui
+s'auto-entretient, et qui relie `VAC:P`, `VAC:T` et `LOSS_W`. À simuler telle quelle à
+l'étape 1.
+
+Règle générale à retenir : sur un accélérateur, la question n'est jamais « combien de
+courant » mais « combien de watts, et à quelle énergie ». L'activation est le problème
+des lignes situées après le linac.

@@ -2,7 +2,7 @@
 
 import pytest
 
-from sim.pvmap import DOMAINS, check, expand
+from sim.pvmap import ALARM_KINDS, DOMAINS, check, expand
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +43,7 @@ def test_les_grandeurs_critiques_sont_surveillees(pvs):
     surveillees = {pv.name for pv in pvs if pv.alarm}
     for nom in (
         "LBE:MACH-01:TRANS",
-        "LBE:MACH-01:LOSS",
+        "LBE:MACH-01:LOSS_W",
         "LBE:VAC-01:P",
         "LBE:BPM-01:X",
         "LBE:ACCT-01:ITF",
@@ -53,7 +53,7 @@ def test_les_grandeurs_critiques_sont_surveillees(pvs):
 
 def test_la_taille_de_la_base_est_stable(pvs):
     """Garde-fou : un ajout non intentionnel doit se voir en revue."""
-    assert len(pvs) == 76
+    assert len(pvs) == 77
 
 
 def test_chaque_canal_declare_son_domaine(pvs):
@@ -77,3 +77,20 @@ def test_un_canal_d_equipement_ne_derive_de_rien(pvs):
     for pv in pvs:
         if pv.domain == "equipement":
             assert not pv.derived_from
+
+
+def test_chaque_seuil_dit_sur_quoi_il_se_justifie(pvs):
+    """Un seuil sans justification est un chiffre posé au hasard."""
+    for pv in pvs:
+        if pv.alarm:
+            assert pv.alarm.get("kind") in ALARM_KINDS, pv.name
+
+
+def test_la_protection_porte_sur_la_puissance_pas_sur_le_courant(pvs):
+    """Revue Q4 : un seuil absolu en µA sur une différence est aveugle dès
+    que la référence bouge. La paroi encaisse des watts."""
+    par_nom = {pv.name: pv for pv in pvs}
+    assert par_nom["LBE:MACH-01:LOSS"].alarm == {}
+    assert par_nom["LBE:MACH-01:LOSS_W"].alarm["kind"] == "protection"
+    assert par_nom["LBE:MACH-01:LOSS_W"].egu == "W"
+    assert par_nom["LBE:MACH-01:TRANS"].alarm["kind"] == "exploitation"
